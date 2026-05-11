@@ -5,10 +5,10 @@ const SESSION_KEY = "budget-supabase-session-v1";
 const expenseCategories = {
   Logement: ["Loyer", "Électricité", "Eau", "Assurance habitation", "Internet"],
   Transport: ["Carburant", "Péage", "Parking", "Assurance auto", "Entretien véhicule", "Transport en commun", "Train","Taxi / Uber"],
-  Alimentation: ["Courses", "Restaurants", "Café", "Bars", "Snacks"],
+  Alimentation: ["Courses", "Restaurants", "Café", "Snacks"],
   Santé: ["Médecin", "Pharmacie", "Mutuelle"],
-  Loisirs: ["Jeux vidéo", "Sorties", "Escalade", "Vêtements", "Salle de sport", "Hobbies"],
-  Abonnements: ["Spotify", "Netflix", "ChatGPT", "Amazon Prime", "SFR Ludo", "SFR Alix", "TCL"],
+  Loisirs: ["Jeux vidéo", "Sorties", "Escalade", "Vêtements", "Bars" , "Hobbies"],
+  Abonnements: ["Spotify", "Netflix", "ChatGPT", "Amazon Prime", "SFR Ludo", "SFR Alix", "TCL", "Salle de sport", "Tél."],
   Achats: ["Vêtements", "Électronique", "Maison", "Cadeaux"],
   Divers: ["Frais bancaires", "Avances", "Autres"],
   Mamaou: ["Croquettes", "Véto", "Assurance"],

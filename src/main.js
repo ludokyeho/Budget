@@ -28,6 +28,8 @@ let ui = {
   tab: "budget",
   selectedCategory: null,
   modal: null,
+  editingTransactionId: null,
+  transactionDraft: null,
   unlocked: false,
   viewMonth: state.currentMonth,
   localMode: false,
@@ -204,6 +206,54 @@ function personTotals(month = viewedMonth()) {
 
 function defaultTransactionDate() {
   return viewedMonth() === state.currentMonth ? today() : viewedMonth();
+}
+
+function createTransactionDraft(type, tx = null) {
+  const categoryMap = type === "expense" ? expenseCategories : revenueCategories;
+  const firstCategory = Object.keys(categoryMap)[0];
+  const category = tx?.category && categoryMap[tx.category] ? tx.category : firstCategory;
+  const subcategory = tx?.subcategory && categoryMap[category].includes(tx.subcategory)
+    ? tx.subcategory
+    : categoryMap[category][0];
+
+  return {
+    date: tx?.date || defaultTransactionDate(),
+    amount: tx ? String(tx.amount).replace(".", ",") : "",
+    category,
+    subcategory,
+    comment: tx?.comment || "",
+    person: tx?.person || "Commun",
+  };
+}
+
+function openTransactionModal(type, tx = null) {
+  ui.modal = type;
+  ui.editingTransactionId = tx?.id || null;
+  ui.transactionDraft = createTransactionDraft(type, tx);
+  render();
+}
+
+function closeTransactionModal() {
+  ui.modal = null;
+  ui.editingTransactionId = null;
+  ui.transactionDraft = null;
+  render();
+}
+
+function updateTransactionDraftFromForm(form) {
+  if (!form) return;
+  const type = form.dataset.type;
+  const categoryMap = type === "expense" ? expenseCategories : revenueCategories;
+  const category = form.elements.category.value;
+  const subcategory = form.elements.subcategory.value || categoryMap[category][0];
+  ui.transactionDraft = {
+    date: form.elements.date.value,
+    amount: form.elements.amount.value,
+    category,
+    subcategory,
+    comment: form.elements.comment.value,
+    person: type === "expense" ? form.elements.person.value : "",
+  };
 }
 
 function getSupabaseConfig() {
@@ -386,8 +436,9 @@ async function pullCloudState(options = {}) {
 
   cloud.remoteUpdatedAt = row.updated_at;
   cloud.error = "";
+  const previousViewMonth = ui.viewMonth;
   state = normalizeState(row.data);
-  ui.viewMonth = state.currentMonth;
+  ui.viewMonth = knownMonths().includes(previousViewMonth) ? previousViewMonth : state.currentMonth;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -803,7 +854,10 @@ function renderPanelTransaction(tx) {
         <span>${date}${tx.person ? ` · ${escapeHtml(tx.person)}` : ""}</span>
         ${tx.comment ? `<small>${escapeHtml(tx.comment)}</small>` : ""}
       </div>
-      <b>${formatEuro(tx.amount)}</b>
+      <div class="panel-tx-actions">
+        <b>${formatEuro(tx.amount)}</b>
+        <button class="small-action" data-edit="${tx.id}" title="Modifier">Modifier</button>
+      </div>
     </article>
   `;
 }
@@ -846,7 +900,10 @@ function renderTransaction(tx) {
       </div>
       <aside>
         <b class="${tx.type === "expense" ? "expense" : "revenue"}">${tx.type === "expense" ? "-" : "+"}${formatEuro(tx.amount)}</b>
-        <button class="icon-button danger" data-delete="${tx.id}" title="Supprimer">${icon("trash")}</button>
+        <div class="tx-actions">
+          <button class="small-action" data-edit="${tx.id}" title="Modifier">Modifier</button>
+          <button class="icon-button danger" data-delete="${tx.id}" title="Supprimer">${icon("trash")}</button>
+        </div>
       </aside>
     </article>
   `;
@@ -854,24 +911,26 @@ function renderTransaction(tx) {
 
 function renderTransactionModal(type) {
   const categoryMap = type === "expense" ? expenseCategories : revenueCategories;
-  const firstCategory = Object.keys(categoryMap)[0];
+  if (!ui.transactionDraft) ui.transactionDraft = createTransactionDraft(type);
+  const draft = ui.transactionDraft;
+  const editing = Boolean(ui.editingTransactionId);
   return `
     <div class="modal-backdrop">
       <form class="modal" id="transaction-form" data-type="${type}">
         <header>
           <div>
             <span class="eyebrow">${monthLabel(viewedMonth())}</span>
-            <h2>${type === "expense" ? "Ajouter une dépense" : "Ajouter un revenu"}</h2>
+            <h2>${editing ? "Modifier" : "Ajouter"} ${type === "expense" ? "une dépense" : "un revenu"}</h2>
           </div>
           <button type="button" class="icon-button" data-action="close-modal">×</button>
         </header>
-        <label>Date<input name="date" type="date" value="${defaultTransactionDate()}" /></label>
-        <label>Montant<input name="amount" inputmode="decimal" placeholder="0,00" /></label>
-        <label>Catégorie<select name="category">${Object.keys(categoryMap).map((cat) => `<option>${cat}</option>`).join("")}</select></label>
-        <label>Sous-catégorie<select name="subcategory">${categoryMap[firstCategory].map((sub) => `<option>${sub}</option>`).join("")}</select></label>
-        ${type === "expense" ? `<label>Pour qui ?<select name="person"><option>Commun</option><option>Ludo</option><option>Alix</option></select></label>` : ""}
-        <label>Commentaire<textarea name="comment" rows="3"></textarea></label>
-        <button class="primary" type="submit">${type === "expense" ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
+        <label>Date<input name="date" type="date" value="${escapeHtml(draft.date)}" /></label>
+        <label>Montant<input name="amount" inputmode="decimal" placeholder="0,00" value="${escapeHtml(draft.amount)}" /></label>
+        <label>Catégorie<select name="category">${Object.keys(categoryMap).map((cat) => `<option value="${escapeHtml(cat)}" ${cat === draft.category ? "selected" : ""}>${cat}</option>`).join("")}</select></label>
+        <label>Sous-catégorie<select name="subcategory">${categoryMap[draft.category].map((sub) => `<option value="${escapeHtml(sub)}" ${sub === draft.subcategory ? "selected" : ""}>${sub}</option>`).join("")}</select></label>
+        ${type === "expense" ? `<label>Pour qui ?<select name="person">${["Commun", "Ludo", "Alix"].map((person) => `<option value="${person}" ${person === draft.person ? "selected" : ""}>${person}</option>`).join("")}</select></label>` : ""}
+        <label>Commentaire<textarea name="comment" rows="3">${escapeHtml(draft.comment)}</textarea></label>
+        <button class="primary" type="submit">${editing ? "Enregistrer les modifications" : type === "expense" ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
       </form>
     </div>
   `;
@@ -975,14 +1034,19 @@ function bindApp() {
 
   document.querySelectorAll("[data-modal]").forEach((button) => {
     button.addEventListener("click", () => {
-      ui.modal = button.dataset.modal;
-      render();
+      openTransactionModal(button.dataset.modal);
     });
   });
 
   document.querySelector("[data-action='close-modal']")?.addEventListener("click", () => {
-    ui.modal = null;
-    render();
+    closeTransactionModal();
+  });
+
+  document.querySelectorAll("[data-edit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const tx = state.transactions.find((transaction) => transaction.id === button.dataset.edit);
+      if (tx) openTransactionModal(tx.type, tx);
+    });
   });
 
   document.querySelectorAll("[data-delete]").forEach((button) => {
@@ -1002,27 +1066,55 @@ function bindTransactionForm() {
   const category = form.elements.category;
   const subcategory = form.elements.subcategory;
 
+  const refreshSubcategories = () => {
+    const allowed = categoryMap[category.value];
+    const selected = allowed.includes(ui.transactionDraft?.subcategory) ? ui.transactionDraft.subcategory : allowed[0];
+    subcategory.innerHTML = allowed
+      .map((sub) => `<option value="${escapeHtml(sub)}" ${sub === selected ? "selected" : ""}>${sub}</option>`)
+      .join("");
+    subcategory.value = selected;
+    updateTransactionDraftFromForm(form);
+  };
+
+  form.querySelectorAll("input, select, textarea").forEach((field) => {
+    field.addEventListener("input", () => updateTransactionDraftFromForm(form));
+    field.addEventListener("change", () => updateTransactionDraftFromForm(form));
+  });
+
   category.addEventListener("change", () => {
-    subcategory.innerHTML = categoryMap[category.value].map((sub) => `<option>${sub}</option>`).join("");
+    ui.transactionDraft = {
+      ...ui.transactionDraft,
+      category: category.value,
+      subcategory: categoryMap[category.value][0],
+    };
+    refreshSubcategories();
   });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    updateTransactionDraftFromForm(form);
+    const draft = ui.transactionDraft || createTransactionDraft(type);
     const amount = Number(form.elements.amount.value.replace(",", "."));
     if (!amount || amount <= 0) return;
+    const id = ui.editingTransactionId || crypto.randomUUID();
     const tx = {
-      id: crypto.randomUUID(),
+      id,
       type,
       month: viewedMonth(),
-      date: form.elements.date.value,
+      date: draft.date,
       amount,
-      category: category.value,
-      subcategory: subcategory.value,
-      comment: form.elements.comment.value.trim(),
-      person: type === "expense" ? form.elements.person.value : "",
+      category: draft.category,
+      subcategory: draft.subcategory,
+      comment: draft.comment.trim(),
+      person: type === "expense" ? draft.person : "",
     };
+    const transactions = ui.editingTransactionId
+      ? state.transactions.map((transaction) => transaction.id === id ? tx : transaction)
+      : [tx, ...state.transactions];
     ui.modal = null;
-    saveState({ ...state, transactions: [tx, ...state.transactions] });
+    ui.editingTransactionId = null;
+    ui.transactionDraft = null;
+    saveState({ ...state, transactions });
   });
 }
 

@@ -797,7 +797,8 @@ function renderDetailPanel(category) {
     ? details.map((item, index) => {
       const start = details.slice(0, index).reduce((sum, entry) => sum + entry.value, 0) / total * 360;
       const end = start + item.value / total * 360;
-      return `${colors[index % colors.length]} ${start}deg ${end}deg`;
+      const categoryIndex = expenseCategories[category].indexOf(item.name);
+      return `${colors[categoryIndex % colors.length]} ${start}deg ${end}deg`;
     }).join(", ")
     : "#e8ebe3 0deg 360deg";
 

@@ -21,7 +21,7 @@ const revenueCategories = {
   Divers: ["Cours particuliers", "Remboursements", "Autres"],
 };
 
-const colors = ["#111827", "#0f766e", "#d97706", "#2563eb", "#be123c", "#7c3aed", "#4b5563", "#059669", "#c2410c"];
+const colors = ["#111827", "#0f766e", "#d97706", "#2563eb", "#be123c", "#7c3aed", "#4b5563", "#059669", "#c2410c","#0284c7"];
 
 let state = loadLocalState();
 let ui = {

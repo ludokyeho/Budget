@@ -9,7 +9,28 @@
     <title>Budget</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="boot-fallback">
+        <section>
+          <h1>Budget</h1>
+          <p>Chargement de l'application...</p>
+        </section>
+      </main>
+    </div>
+    <noscript>Active JavaScript pour utiliser Budget.</noscript>
+    <script>
+      window.addEventListener("error", function (event) {
+        var root = document.getElementById("root");
+        if (!root) return;
+        root.innerHTML = '<main class="boot-fallback"><section><h1>Budget</h1><p>Erreur au chargement : ' + String(event.message || "fichier introuvable") + '</p></section></main>';
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        var root = document.getElementById("root");
+        if (!root) return;
+        var reason = event.reason && event.reason.message ? event.reason.message : event.reason;
+        root.innerHTML = '<main class="boot-fallback"><section><h1>Budget</h1><p>Erreur de synchronisation : ' + String(reason || "inconnue") + '</p></section></main>';
+      });
+    </script>
     <script src="./src/config.js"></script>
     <script type="module" src="./src/main.js"></script>
   </body>
